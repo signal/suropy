@@ -1,4 +1,5 @@
 from logging import getLogger
+import lzf
 import struct
 import zlib
 
@@ -14,28 +15,34 @@ logger = getLogger(__name__)
 
 APP_NAME = "suropy-client"
 
-def write_messages_into(write_buffer, routing_key, *payloads):
+def write_messages_into(write_buffer, routing_key, compression, *payloads):
   for payload in payloads:
     key_length = len(routing_key)
     payload_length = len(payload)
     # modified UTF 8 + payload length + payload
     fmt = '!H%dsi%ds' % (key_length, payload_length)
-    map(write_buffer.append, struct.pack(fmt, key_length, routing_key, payload_length, payload))
+    map(write_buffer.append, compress(struct.pack(fmt, key_length, routing_key, payload_length, payload), compression))
 
 def generate_crc(read_only_buffer):
   return zlib.crc32(read_only_buffer) & 0xffffffff
 
-def create_message_set(app_name, routing_key, *messages):
+def create_message_set(app_name, routing_key, compression, *messages):
   """Creates a single TMessageSet for all the messages passed in.
 
   TODO: support LZF compression for the message set.
   """
 
   write_buffer = bytearray()
-  write_messages_into(write_buffer, routing_key, *messages)
+  write_messages_into(write_buffer, routing_key, compression, *messages)
   read_only_buffer = buffer(write_buffer)
-  return TMessageSet(app=app_name, compression=0, numMessages=len(messages),
+  return TMessageSet(app=app_name, compression=compression, numMessages=len(messages),
     crc=generate_crc(read_only_buffer), messages=read_only_buffer)
+
+def compress(text, compression):
+  """Uses LZF to compress a plain text string into a byte array if compression is enabled, otherwise
+  the target string is return unmodified"""
+
+  return lzf.compress(text, len(text) * 2) if compression else text
 
 class SuroClient(object):
   """A synchronous client for a suro-server, that sends messages sets one at a time.
@@ -44,14 +51,15 @@ class SuroClient(object):
   is opened automatically.
   """
 
-  def __init__(self, hostname="localhost", port=7101, app_name=APP_NAME):
+  def __init__(self, hostname="localhost", port=7101, app_name=APP_NAME, compression=None):
     self.transport = TTransport.TFramedTransport(TSocket.TSocket(hostname, port))
     self.client = SuroServer.Client(TBinaryProtocol.TBinaryProtocol(self.transport))
     self.app_name = app_name
+    self.compression = compression
 
   def send_messages(self, routing_key, *messages):
     try:
-      self.client.process(create_message_set(self.app_name, routing_key, *messages))
+      self.client.process(create_message_set(self.app_name, routing_key, self.compression, *messages))
     except:
       logger.exception("Unable to send messages")
 

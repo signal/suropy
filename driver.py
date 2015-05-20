@@ -2,7 +2,7 @@
 """Simple program to exercise the suro client class.
 
 Usage:
-  driver.py [--host=<h>] [--port=<p>] [--key=<k>] MESSAGE ...
+  driver.py [--host=<h>] [--port=<p>] [--key=<k>] [--compression] MESSAGE ...
 
 Arguments:
    MESSAGE string messages to send, each message should be enclosed in quotes
@@ -11,6 +11,7 @@ Options:
   --key=<k>  The routing key to use for the messages [default: suropy-driver]
   --host=<h>  The hostname of the suro server to connect to [default: localhost]
   --port=<p>  The port of the suro server to connect to [default: 7101]
+  --compression  Enables LZF message compression
 """
 
 from docopt import docopt
@@ -47,7 +48,7 @@ if __name__=="__main__":
   args = docopt(__doc__)
   config.dictConfig(logging_config)
   try:
-    with SuroClient(args['--host'], int(args['--port'])) as client:
+    with SuroClient(args['--host'], int(args['--port']), compression=args['--compression']) as client:
       client.send_messages(args['--key'], *[x.encode('utf-8') for x in args['MESSAGE']])
   except Thrift.TException, tx:
     print '%s' % (tx.message)
