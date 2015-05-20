@@ -49,15 +49,21 @@ class SuroClient(object):
     self.client = SuroServer.Client(TBinaryProtocol.TBinaryProtocol(self.transport))
     self.app_name = app_name
 
+  def startup(self):
+    self.transport.open()
+
   def send_messages(self, routing_key, *messages):
     try:
       self.client.process(create_message_set(self.app_name, routing_key, *messages))
     except:
       logger.exception("Unable to send messages")
 
+  def shutdown(self):
+    self.transport.close()
+
   def __enter__(self):
-    self.transport.open()
+    self.startup()
     return self
 
   def __exit__(self, exc_type, exc_value, traceback):
-    self.transport.close()
+    self.shutdown()
