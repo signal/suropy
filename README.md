@@ -7,7 +7,7 @@ TODO
 
 To install, use pip:
 
-    pip install suropy -e git+git@github.com:signal/suropy.git#egg=suropy
+    pip install suropy -e git+https://github.com/signal/suropy.git#egg=suropy
 
 ## Executing
 
